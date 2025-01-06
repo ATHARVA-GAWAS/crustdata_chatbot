@@ -1,33 +1,54 @@
+import requests
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
 
+# Sample questions and their predefined API request examples
 SAMPLE_QA = {
-    "How do I search for people given their current title, current company and location?": (
-        "You can use `api.crustdata.com/screener/person/search` endpoint. "
-        "Here is an example curl request to find people with title engineer at OpenAI in San Francisco:\n\n"
-        "```\n"
-        "curl --location 'https://api.crustdata.com/screener/person/search' \\\n"
-        "--header 'Content-Type: application/json' \\\n"
-        "--header 'Authorization: Token $token' \\\n"
-        "--data '{\n"
-        "    \"filters\": [\n"
-        "        {\"filter_type\": \"CURRENT_COMPANY\", \"type\": \"in\", \"value\": [\"openai.com\"]},\n"
-        "        {\"filter_type\": \"CURRENT_TITLE\", \"type\": \"in\", \"value\": [\"engineer\"]},\n"
-        "        {\"filter_type\": \"REGION\", \"type\": \"in\", \"value\": [\"San Francisco, California, United States\"]}\n"
-        "    ],\n"
-        "    \"page\": 1\n"
-        "}'\n"
-        "```"
-    ),
-    "I tried using the screener/person/search API to compare against previous values this weekend. I am blocked on the filter values.": (
-        "Yes, there is a specific list of regions listed here: "
-        "[Crustdata Regions](https://crustdata-docs-region-json.s3.us-east-2.amazonaws.com/updated_regions.json). "
-        "Is there a way you can find the region from this list first and then put the exact values in the search?"
-    ),
+    "How do I search for people given their current title, current company and location?": {
+        "question": "How do I search for people given their current title, current company, and location?",
+        "api_request": {
+            "url": "https://api.crustdata.com/screener/person/search",
+            "method": "POST",
+            "headers": {
+                "Content-Type": "application/json",
+                "Authorization": "Token $token"
+            },
+            "data": {
+                "filters": [
+                    {"filter_type": "CURRENT_COMPANY", "type": "in", "value": ["openai.com"]},
+                    {"filter_type": "CURRENT_TITLE", "type": "in", "value": ["engineer"]},
+                    {"filter_type": "REGION", "type": "in", "value": ["San Francisco, California, United States"]}
+                ],
+                "page": 1
+            }
+        },
+        "response": "You can use `api.crustdata.com/screener/person/search` endpoint. Here is an example curl request to find people with title engineer at OpenAI in San Francisco."
+    },
+    "What is an API?": {
+        "question": "What is an API?",
+        "response": "API stands for Application Programming Interface. It allows two applications to communicate with each other. APIs are used to request data, send data, or even update systems from one system to another."
+    }
 }
 
+# Function to validate and execute API request
+def validate_and_execute_api_request(api_request):
+    try:
+        response = requests.request(
+            method=api_request["method"],
+            url=api_request["url"],
+            headers=api_request["headers"],
+            json=api_request["data"]
+        )
+
+        if response.status_code == 200:
+            return response.json()  # Return successful response
+        else:
+            return {"error": f"API Request failed with status code {response.status_code}", "details": response.text}
+
+    except Exception as e:
+        return {"error": f"API request failed due to error: {str(e)}"}
 
 # View to render chatbot page
 def chatbot_page(request):
@@ -41,15 +62,32 @@ def chatbot_response(request):
             data = json.loads(request.body)
             user_message = data.get('message', '').strip()
 
-            # Match sample questions
-            response = SAMPLE_QA.get(user_message, None)
+            # Check if the user's message matches a predefined question
+            qa = SAMPLE_QA.get(user_message, None)
 
-            if response:
-                return JsonResponse({'response': response}, status=200)
+            if qa:
+                # If it involves an API request, validate and send the request
+                if "api_request" in qa:
+                    api_result = validate_and_execute_api_request(qa["api_request"])
+                    
+                    # Check if the API result contains an error
+                    if "error" in api_result:
+                        return JsonResponse({
+                            'response': f"Sorry, there was an issue with the API request: {api_result['error']}. Here are the details: {api_result.get('details', '')}"
+                        }, status=400)
+                    else:
+                        return JsonResponse({
+                            'response': qa["response"] + "\nAPI Request was successful! Here is the result: " + str(api_result)
+                        }, status=200)
+                else:
+                    # Simple non-API-based response
+                    return JsonResponse({'response': qa["response"]}, status=200)
 
-            # Default fallback response
-            return JsonResponse({'response': "I'm sorry, I couldn't understand your question. Please try rephrasing it."}, status=200)
+            else:
+                # Fallback if no predefined answer exists
+                return JsonResponse({'response': "I'm sorry, I couldn't understand your question. Please try rephrasing it."}, status=200)
 
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON payload'}, status=400)
+
     return JsonResponse({'error': 'Invalid request method'}, status=405)
