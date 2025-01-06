@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crustdata Chatbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+        }
+        #chat-container {
+            max-width: 600px;
+            margin: 50px auto;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+        #chat-box {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 4px;
+            background: #f9f9f9;
+        }
+        .chat-message {
+            margin: 10px 0;
+        }
+        .chat-message.user {
+            text-align: right;
+            color: #007bff;
+        }
+        .chat-message.bot {
+            text-align: left;
+            color: #555;
+        }
+        #input-container {
+            display: flex;
+            margin-top: 10px;
+        }
+        #user-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        #send-btn {
+            padding: 10px 20px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        #send-btn:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div id="chat-container">
+        <h2>Crustdata Chatbot</h2>
+        <div id="chat-box"></div>
+        <div id="input-container">
+            <input type="text" id="user-input" placeholder="Type your message here..." />
+            <button id="send-btn">Send</button>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('send-btn').addEventListener('click', function () {
+            const userInput = document.getElementById('user-input').value.trim();
+            const chatBox = document.getElementById('chat-box');
+
+            if (userInput === '') return;
+
+            // Append user message
+            const userMessage = document.createElement('div');
+            userMessage.classList.add('chat-message', 'user');
+            userMessage.textContent = userInput;
+            chatBox.appendChild(userMessage);
+
+            // Scroll chat box to bottom
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            // Clear input field
+            document.getElementById('user-input').value = '';
+
+            // Send message to backend
+            fetch('/api/get-response/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ message: userInput }),
+            })
+                .then((response) => response.json())
+                .then((data) => {
+                    // Append bot response
+                    const botMessage = document.createElement('div');
+                    botMessage.classList.add('chat-message', 'bot');
+                    botMessage.textContent = data.response || 'Error: Could not fetch response';
+                    chatBox.appendChild(botMessage);
+
+                    // Scroll chat box to bottom
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                });
+        });
+    </script>
+</body>
+</html>
